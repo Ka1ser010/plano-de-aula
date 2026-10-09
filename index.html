@@ -105,7 +105,7 @@
     font-size: 0.78rem;
   }
 
-  input[type=text], input[type=number], textarea{
+  input[type=text], input[type=number], input[type=date], textarea{
     width: 100%;
     border: 1px solid var(--line);
     border-radius: 6px;
@@ -205,7 +205,7 @@
   <div class="wave">
     <div class="wave-inner">
       <div class="brand">
-        <img src="logo_acqua_encanto.jpg" style="width:200px;border-radius:12px;margin:0 auto 16px;display:block">
+<img src="logo_acqua_encanto.jpg" style="width:200px;border-radius:12px;margin:0 auto 16px;display:block">
         <h1>Plano de Aula — Escola de Natação</h1>
       </div>
       <p>Preencha os campos abaixo. Ao enviar, uma cópia da aula é salva automaticamente como um documento na pasta do Google Drive da escola — data e horário são registrados automaticamente.</p>
@@ -218,22 +218,20 @@
   <main>
     <form class="sheet" id="planoForm" onsubmit="return false;">
 
-      <div class="section-title" style="border-top:none;padding-top:0;margin-top:0;">Identificação</div>
-      <div class="field-block">
-        <label for="nomeAluno">Nome do Aluno <span class="req">*</span></label>
-        <input type="text" id="nomeAluno" placeholder="Nome completo do aluno">
+      <div class="section-title" style="border-top:none;padding-top:0;margin-top:0;">Período</div>
+      <div class="row">
+        <div>
+          <label for="dataInicio">Data de início <span class="req">*</span></label>
+          <input type="date" id="dataInicio">
+        </div>
+        <div>
+          <label for="dataTermino">Data de término <span class="req">*</span></label>
+          <input type="date" id="dataTermino">
+        </div>
       </div>
-      <div class="row four">
+      <div class="row">
         <div>
-          <label for="turma">Turma</label>
-          <input type="text" id="turma" placeholder="Ex: Baby 2">
-        </div>
-        <div>
-          <label for="idade">Idade</label>
-          <input type="text" id="idade" placeholder="Ex: 4–5 anos">
-        </div>
-        <div>
-          <label for="data">Data <span class="auto">(automático)</span></label>
+          <label for="data">Data do preenchimento <span class="auto">(automático)</span></label>
           <input type="text" id="data" readonly>
         </div>
         <div>
@@ -305,7 +303,7 @@
 // URL fixa do Web App do Apps Script. Só é alterável editando este arquivo
 // (não existe mais campo na tela para trocar), evitando que alguém mude
 // o destino dos envios sem querer.
-const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyJn-yYGHJwQjZNqemPNxFDjxd3uM_O3YPiEJ4T52koeijEwXnEEdusuX11seFVk4R6/exec";
+const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzJbAFTfYoHnThkNletlkVbYFI91bhPK9ed5PTTXiLYFfdLdKYFCpZ0iBKTSeUzxnnK/exec";
 
 function pad2(n){ return n.toString().padStart(2, '0'); }
 
@@ -315,6 +313,28 @@ function atualizarDataHora(){
   document.getElementById('horario').value = `${pad2(agora.getHours())}:${pad2(agora.getMinutes())}`;
 }
 atualizarDataHora();
+
+function formatarDataISO(iso){
+  // "2026-10-13" -> "13/10/2026"
+  if (!iso) return '';
+  const [a, m, d] = iso.split('-');
+  return `${d}/${m}/${a}`;
+}
+
+// Garante que o término nunca seja anterior ao início e abre o calendário ao clicar.
+(function initCalendarios(){
+  const ini = document.getElementById('dataInicio');
+  const fim = document.getElementById('dataTermino');
+  ini.addEventListener('change', () => {
+    fim.min = ini.value || '';
+    if (fim.value && ini.value && fim.value < ini.value) fim.value = '';
+  });
+  [ini, fim].forEach(el => {
+    el.addEventListener('click', () => {
+      try { if (el.showPicker) el.showPicker(); } catch (e) {}
+    });
+  });
+})();
 
 function val(id){
   return document.getElementById(id).value.trim();
@@ -340,9 +360,8 @@ function sanitizeFileName(str){
 
 function coletarDados(){
   return {
-    nomeAluno: val('nomeAluno'),
-    turma: val('turma'),
-    idade: val('idade'),
+    dataInicio: formatarDataISO(val('dataInicio')),
+    dataTermino: formatarDataISO(val('dataTermino')),
     data: val('data'),
     horario: val('horario'),
     tema: val('tema'),
@@ -367,15 +386,10 @@ function buildDocHtml(){
     <h2 style="margin-bottom:4px;">PLANO DE AULA — ESCOLA DE NATAÇÃO</h2>
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
       <tr>
-        <td style="padding:2px 0;"><b>ALUNO:</b> ${escapeHtml(d.nomeAluno) || "&nbsp;"}</td>
-        <td style="padding:2px 0;"><b>TURMA:</b> ${escapeHtml(d.turma) || "&nbsp;"}</td>
+        <td style="padding:2px 0;" colspan="2"><b>PERÍODO:</b> ${escapeHtml(d.dataInicio) || "&nbsp;"} a ${escapeHtml(d.dataTermino) || "&nbsp;"}</td>
       </tr>
       <tr>
-        <td style="padding:2px 0;"><b>IDADE:</b> ${escapeHtml(d.idade) || "&nbsp;"}</td>
-        <td style="padding:2px 0;"></td>
-      </tr>
-      <tr>
-        <td style="padding:2px 0;"><b>DATA:</b> ${escapeHtml(d.data) || "&nbsp;"}</td>
+        <td style="padding:2px 0;"><b>PREENCHIDO EM:</b> ${escapeHtml(d.data) || "&nbsp;"}</td>
         <td style="padding:2px 0;"><b>HORÁRIO:</b> ${escapeHtml(d.horario) || "&nbsp;"}</td>
       </tr>
     </table>
@@ -397,11 +411,11 @@ function baixarPlano(){
   const html = buildDocHtml();
   const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
   const url = URL.createObjectURL(blob);
-  const nomePart = sanitizeFileName(val('nomeAluno')) || 'aluno';
-  const dataPart = sanitizeFileName(val('data')) || 'sem_data';
+  const nomePart = sanitizeFileName(formatarDataISO(val('dataInicio'))) || 'sem_inicio';
+  const dataPart = sanitizeFileName(formatarDataISO(val('dataTermino'))) || 'sem_termino';
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Plano_de_Aula_${nomePart}_${dataPart}.doc`;
+  a.download = `Plano_de_Aula_${nomePart}_a_${dataPart}.doc`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -425,9 +439,19 @@ async function enviarPlano(){
     showStatus('WEBHOOK_URL não configurada no arquivo.', 'err');
     return;
   }
-  if (!val('nomeAluno')){
-    showStatus('Informe o nome do aluno antes de enviar.', 'err');
-    document.getElementById('nomeAluno').focus();
+  if (!val('dataInicio')){
+    showStatus('Selecione a data de início do período.', 'err');
+    document.getElementById('dataInicio').focus();
+    return;
+  }
+  if (!val('dataTermino')){
+    showStatus('Selecione a data de término do período.', 'err');
+    document.getElementById('dataTermino').focus();
+    return;
+  }
+  if (val('dataTermino') < val('dataInicio')){
+    showStatus('A data de término não pode ser anterior à de início.', 'err');
+    document.getElementById('dataTermino').focus();
     return;
   }
 
@@ -458,6 +482,7 @@ async function enviarPlano(){
 function limparFormulario(){
   if(!confirm('Limpar todos os campos deste plano?')) return;
   document.getElementById('planoForm').reset();
+  document.getElementById('dataTermino').min = '';
   atualizarDataHora();
   showStatus('Formulário limpo.', 'ok');
 }
